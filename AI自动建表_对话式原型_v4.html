@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CMS 数据管理 — AI 智能建表</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'PingFang SC', 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    background: #f0f1f3;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #1a1a1a;
+  }
+
+  /* ===== 弹窗 ===== */
+  .modal {
+    width: 680px;
+    height: 86vh;
+    max-height: 840px;
+    background: #fff;
+    border: 1px solid #d0d0d0;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* 头部 */
+  .m-header {
+    height: 52px;
+    padding: 0 20px;
+    border-bottom: 1px solid #e5e5e5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    background: #fafafa;
+  }
+  .m-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  .m-title-icon { font-size: 18px; }
+  .m-badge {
+    font-size: 11px; font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 10px;
+    background: #e8f5e9; color: #2e7d32;
+  }
+  .m-badge.working { background: #fff3e0; color: #e65100; }
+  .m-badge.confirm { background: #e3f2fd; color: #1565c0; }
+  .m-close {
+    width: 28px; height: 28px;
+    border: 1px solid #d0d0d0; border-radius: 6px;
+    background: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; color: #999;
+    transition: all 0.15s;
+  }
+  .m-close:hover { background: #fef2f2; color: #dc2626; border-color: #fca5a5; }
+
+  /* 消息区 */
+  .chat { flex:1; overflow-y:auto; }
+  .chat::-webkit-scrollbar { width:5px; }
+  .chat::-webkit-scrollbar-thumb { background:#d0d0d0; border-radius:3px; }
+
+  .msg {
+    padding: 16px 24px;
+    font-size: 14px;
+    line-height: 1.75;
+    border-bottom: 1px solid #f5f5f5;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+  .msg.ai { background: #fff; }
+  .msg.user { background: #f0f4ff; }
+  .msg-tag {
+    font-size: 10px; font-weight: 700; color: #999;
+    margin-bottom: 6px; letter-spacing: 0.5px;
+  }
+
+  /* ===== 卡片通用 ===== */
+  .card {
+    margin-top: 14px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .card-head {
+    padding: 10px 16px;
+    background: #fafafa;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .card-head-right { font-size: 11px; color: #888; font-weight: 500; }
+  .card-body { padding: 16px; }
+  .card-foot {
+    padding: 10px 16px;
+    background: #fafafa;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* 需求确认列表 */
+  .kv-list { list-style:none; }
+  .kv-item {
+    display: flex;
+    padding: 8px 0;
+    border-bottom: 1px solid #f5f5f5;
+    font-size: 13px;
+    gap: 12px;
+  }
+  .kv-item:last-child { border-bottom:none; }
+  .kv-key { font-weight: 700; color: #555; min-width: 72px; flex-shrink:0; }
+  .kv-val { color: #1a1a1a; }
+
+  /* ===== 数据表卡片 ===== */
+  .tbl-card {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    background: #fff;
+    transition: border-color 0.15s;
+  }
+  .tbl-card:last-child { margin-bottom: 0; }
+  .tbl-card:hover { border-color: #bbb; }
+
+  .tbl-head {
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    background: #fafafa;
+    border-bottom: 1px solid #eee;
+    user-select: none;
+    transition: background 0.1s;
+  }
+  .tbl-head:hover { background: #f5f5f5; }
+  .tbl-left { display: flex; align-items: center; gap: 10px; }
+  .tbl-arrow { font-size: 10px; color: #aaa; transition: transform 0.2s; display: inline-block; }
+  .tbl-arrow.open { transform: rotate(90deg); }
+  .tbl-name { font-size: 13px; font-weight: 700; }
+  .tbl-type {
+    font-size: 10px; font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .tbl-type.archive { background: #e3f2fd; color: #1565c0; }
+  .tbl-type.agg { background: #e8f5e9; color: #2e7d32; }
+  .tbl-type.basic { background: #fff3e0; color: #e65100; }
+  .tbl-meta { font-size: 11px; color: #aaa; }
+
+  .tbl-detail { display:none; padding: 14px; }
+  .tbl-detail.open { display:block; }
+
+  /* 配置信息行 */
+  .cfg-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 12px;
+    background: #f8f9fa;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .cfg-label { font-weight: 700; color: #666; min-width: 56px; }
+  .cfg-val { color: #1a1a1a; font-weight: 500; }
+  .cfg-val b { font-weight: 700; }
+
+  /* 字段表格 */
+  .f-table { width:100%; border-collapse:collapse; margin-top:8px; }
+  .f-table th {
+    background: #f5f6f7;
+    padding: 7px 10px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    color: #666;
+    border-bottom: 2px solid #e0e0e0;
+  }
+  .f-table td {
+    padding: 8px 10px;
+    font-size: 12px;
+    border-bottom: 1px solid #f0f0f0;
+    color: #333;
+  }
+  .f-table tr:last-child td { border-bottom: none; }
+  .f-table tr:hover td { background: #fafbfc; }
+
+  .var-name { color: #1565c0; font-weight: 600; }
+  .formula-tag {
+    font-family: 'SF Mono', 'Consolas', monospace;
+    font-size: 10px; font-weight: 700;
+    padding: 1px 6px; border-radius: 3px;
+    background: #fff8e1; color: #f57f17;
+    border: 1px solid #ffecb3;
+  }
+  .agg-tag {
+    font-size: 10px; font-weight: 700;
+    padding: 1px 6px; border-radius: 3px;
+    background: #e8f5e9; color: #2e7d32;
+    border: 1px solid #c8e6c9;
+  }
+
+  /* 汇总栏 */
+  .summary-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 12px;
+  }
+  .summary-stats { display: flex; gap: 20px; font-weight: 600; }
+  .summary-stat { display: flex; align-items: center; gap: 4px; }
+  .summary-num { font-size: 20px; font-weight: 800; color: #1a1a1a; }
+  .summary-label { color: #888; }
+  .summary-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .summary-dot.blue { background: #1565c0; }
+  .summary-dot.green { background: #2e7d32; }
+
+  /* ===== 按钮 ===== */
+  .btn {
+    padding: 7px 16px;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    background: #fff;
+    color: #333;
+    font-weight: 600;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .btn:hover { background: #f5f5f5; border-color: #bbb; }
+  .btn-primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  .btn-primary:hover { background: #333; }
+  .btn-sm { padding: 5px 12px; font-size: 11px; }
+  .btn-link { background:none; border:none; color:#1565c0; padding:5px 8px; box-shadow:none; text-decoration:underline; }
+  .btn-link:hover { color:#0d47a1; background:none; }
+
+  /* 快捷标签 */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .chip {
+    font-size: 12px; padding: 6px 14px;
+    background: #f5f5f5; border: 1px solid #e0e0e0;
+    border-radius: 20px; cursor: pointer;
+    color: #555; transition: all 0.15s;
+    font-weight: 500;
+  }
+  .chip:hover { background: #e8f0fe; color: #1565c0; border-color: #90caf9; }
+
+  /* 输入区 */
+  .input-area {
+    padding: 12px 16px 14px;
+    border-top: 1px solid #e5e5e5;
+    background: #fafafa;
+    flex-shrink: 0;
+  }
+  .input-row {
+    display: flex;
+    border: 1px solid #d0d0d0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+    transition: border-color 0.15s;
+  }
+  .input-row:focus-within { border-color: #1565c0; box-shadow: 0 0 0 2px rgba(21,101,192,0.1); }
+  .input-attach {
+    width: 40px; display: flex; align-items: center; justify-content: center;
+    border-right: 1px solid #eee; cursor: pointer; font-size: 16px; color: #999;
+    background: #fafafa; flex-shrink: 0; border: none;
+  }
+  .input-attach:hover { color: #1565c0; background: #f0f4ff; }
+  .input-text {
+    flex:1; border:none; padding: 10px 14px;
+    font-size: 14px; font-family: inherit;
+    outline: none; background: transparent;
+  }
+  .input-send {
+    width: 44px; display: flex; align-items: center; justify-content: center;
+    background: #1a1a1a; color: #fff; border: none;
+    cursor: pointer; font-size: 14px; font-weight: 700; flex-shrink: 0;
+  }
+  .input-send:hover { background: #333; }
+  .input-hint { text-align:center; font-size:10px; color:#bbb; margin-top:6px; }
+
+  /* 打字 */
+  .dots { display:inline-flex; gap:4px; padding:4px 0; }
+  .dots span { width:5px; height:5px; background:#bbb; border-radius:50%; animation:blink 1.2s infinite ease-in-out; }
+  .dots span:nth-child(2) { animation-delay:0.2s; }
+  .dots span:nth-child(3) { animation-delay:0.4s; }
+  @keyframes blink { 0%,80%,100%{opacity:0.3;transform:scale(0.8)} 40%{opacity:1;transform:scale(1)} }
+
+  /* 创建日志 */
+  .log-list { font-size: 12px; line-height: 2; color: #666; }
+  .log-list div { animation: fadeIn 0.2s ease; }
+  .log-ok { color: #2e7d32; }
+  .log-wait { color: #999; }
+</style>
+</head>
+<body>
+
+<div class="modal">
+  <div class="m-header">
+    <div class="m-title">
+      <span class="m-title-icon">✨</span>
+      AI 智能建表
+      <span class="m-badge" id="badge">就绪</span>
+    </div>
+    <button class="m-close" title="关闭">✕</button>
+  </div>
+
+  <div class="chat" id="chat"></div>
+
+  <div class="input-area">
+    <div class="input-row">
+      <button class="input-attach" title="上传文档" onclick="attachFile()">📎</button>
+      <input class="input-text" id="inp" placeholder="描述您的建表需求..." onkeydown="if(event.key==='Enter'){event.preventDefault();send();}">
+      <button class="input-send" onclick="send()">➤</button>
+    </div>
+    <div class="input-hint">生成的配置在确认前不会写入系统</div>
+  </div>
+</div>
+
+<script>
+const chat = document.getElementById('chat');
+let step = 0;
+
+function scroll() { setTimeout(()=>{chat.scrollTop=chat.scrollHeight},50); }
+
+function ai(html) {
+  const d = document.createElement('div');
+  d.className = 'msg ai';
+  d.innerHTML = '<div class="msg-tag">AI 助手</div>' + html;
+  chat.appendChild(d); scroll(); return d;
+}
+function user(html) {
+  const d = document.createElement('div');
+  d.className = 'msg user';
+  d.innerHTML = '<div class="msg-tag">用户</div>' + html;
+  chat.appendChild(d); scroll();
+}
+function typing() {
+  const d = document.createElement('div');
+  d.className = 'msg ai'; d.id = 'typing';
+  d.innerHTML = '<div class="msg-tag">AI 助手</div><div class="dots"><span></span><span></span><span></span></div>';
+  chat.appendChild(d); scroll();
+}
+function untype() { const e=document.getElementById('typing'); if(e)e.remove(); }
+
+function badge(t, cls) {
+  const b = document.getElementById('badge');
+  b.textContent = t;
+  b.className = 'm-badge' + (cls ? ' ' + cls : '');
+}
+
+function quickFill(t) { document.getElementById('inp').value = t; document.getElementById('inp').focus(); }
+function attachFile() { const i=document.getElementById('inp'); i.value='[已上传: 需求文档.docx] '+i.value; i.focus(); }
+
+// ===== 发消息 =====
+function send() {
+  const inp = document.getElementById('inp');
+  const t = inp.value.trim(); if(!t) return; inp.value = '';
+
+  if (step===0) { user(t); analyze(t); }
+  else if (step===2) { user(t); modifyPlan(); }
+  else if (step===3) { user(t); typing(); setTimeout(()=>{untype(); ai('如需继续创建，请直接描述新的建表需求。'); step=0; badge('就绪');}, 500); }
+}
+
+// ===== 分析需求 =====
+function analyze(t) {
+  step = -1; badge('分析中','working'); typing();
+  const batch = t.includes('产线') && (t.includes('3') || t.includes('所有') || t.includes('多'));
+  const basic = t.includes('台账') || t.includes('清单') || t.includes('工单') || t.includes('人员') || t.includes('配方');
+  setTimeout(()=>{ untype(); batch ? showBatchConfirm() : (basic ? showBasicConfirm() : showSingleConfirm()); }, 1200);
+}
+
+// ===== 单表确认 =====
+function showSingleConfirm() {
+  ai(`我对您的需求理解如下：
+    <div class="card">
+      <div class="card-head">📌 需求理解确认 <span class="card-head-right">请确认后再生成方案</span></div>
+      <div class="card-body">
+        <ul class="kv-list">
+          <li class="kv-item"><span class="kv-key">业务目标</span><span class="kv-val">二号产线能耗数据采集与按天统计，同时建立设备台账</span></li>
+          <li class="kv-item"><span class="kv-key">数据来源</span><span class="kv-val">PLC 电表变量（累计电量）+ 人工维护台账信息</span></li>
+          <li class="kv-item"><span class="kv-key">采集时机</span><span class="kv-val">每次换班时触发记录</span></li>
+          <li class="kv-item"><span class="kv-key">统计维度</span><span class="kv-val">按天汇总每日总能耗</span></li>
+          <li class="kv-item"><span class="kv-key">建表方案</span><span class="kv-val"><b>创建 3 张表</b>：1 张变量归档表 + 1 张数据聚合表 + 1 张基础数据表</span></li>
+        </ul>
+      </div>
+      <div class="card-foot">
+        <button class="btn btn-sm" onclick="rejectConfirm()">有问题，我补充</button>
+        <button class="btn btn-sm btn-primary" onclick="acceptConfirm('single')">确认，生成方案</button>
+      </div>
+    </div>
+  `);
+  step = 0;
+}
+
+// ===== 批量确认 =====
+function showBatchConfirm() {
+  ai(`我对您的需求理解如下：
+    <div class="card">
+      <div class="card-head">📌 需求理解确认 <span class="card-head-right">请确认后再生成方案</span></div>
+      <div class="card-body">
+        <ul class="kv-list">
+          <li class="kv-item"><span class="kv-key">业务目标</span><span class="kv-val">多产线产量采集与每日汇总统计</span></li>
+          <li class="kv-item"><span class="kv-key">产线范围</span><span class="kv-val">3 条产线（一号线、二号线、三号线）</span></li>
+          <li class="kv-item"><span class="kv-key">每条产线</span><span class="kv-val">1 张产量归档表 + 1 张每日汇总聚合表</span></li>
+          <li class="kv-item"><span class="kv-key">合计</span><span class="kv-val"><b>共 6 张表</b>（3 组串联结构）</span></li>
+        </ul>
+      </div>
+      <div class="card-foot">
+        <button class="btn btn-sm" onclick="rejectConfirm()">有问题，我补充</button>
+        <button class="btn btn-sm btn-primary" onclick="acceptConfirm('batch')">确认，生成方案</button>
+      </div>
+    </div>
+  `);
+  step = 0;
+}
+
+// ===== 基础表确认 =====
+function showBasicConfirm() {
+  ai(`我对您的需求理解如下：
+    <div class="card">
+      <div class="card-head">📌 需求理解确认 <span class="card-head-right">请确认后再生成方案</span></div>
+      <div class="card-body">
+        <ul class="kv-list">
+          <li class="kv-item"><span class="kv-key">业务目标</span><span class="kv-val">建立设备基础信息台账</span></li>
+          <li class="kv-item"><span class="kv-key">数据来源</span><span class="kv-val">人工手动维护（非设备自动采集）</span></li>
+          <li class="kv-item"><span class="kv-key">建表方案</span><span class="kv-val"><b>创建 1 张基础数据表</b></span></li>
+        </ul>
+      </div>
+      <div class="card-foot">
+        <button class="btn btn-sm" onclick="rejectConfirm()">有问题，我补充</button>
+        <button class="btn btn-sm btn-primary" onclick="acceptConfirm('basic')">确认，生成方案</button>
+      </div>
+    </div>
+  `);
+  step = 0;
+}
+
+function rejectConfirm() {
+  ai('好的，请描述需要修改的内容，我会重新理解您的需求。');
+  step = 0; badge('等待输入');
+}
+
+// ===== 确认后生成方案 =====
+function acceptConfirm(mode) {
+  user('确认无误，请生成方案');
+  step = 1; badge('生成中','working'); typing();
+  setTimeout(()=>{
+    untype();
+    if (mode==='single') showSinglePlan();
+    else if (mode==='batch') showBatchPlan();
+    else showBasicPlan();
+  }, 1500);
+}
+
+// ===== 单表方案 =====
+function showSinglePlan() {
+  step = 2; badge('待确认','confirm');
+
+  ai(`方案已生成，请审核以下配置。如需修改可直接输入调整说明。
+    <div class="card">
+      <div class="card-head">📋 建表方案 <span class="card-head-right">共 3 张表</span></div>
+      <div class="card-body" style="padding:12px;">
+        ${buildArchiveCard('二号线能耗归档', '变量触发 — 当 [当前班次] 值变化时', [
+          ['记录时间', '日期时间', '系统时间', ''],
+          ['班次', '文本', '当前班次', ''],
+          ['能耗增量', '浮点数', '累计电量', 'CHANGE()'],
+        ], true)}
+        ${buildAggCard('二号线每日能耗汇总', '二号线能耗归档', '定时触发 — 每日 00:00', [
+          ['日期', '日期', '记录时间', '分组(按天)', ''],
+          ['日总能耗', '浮点数', '能耗增量', '求和(Sum)', ''],
+        ], true)}
+        ${buildBasicCard('二号线设备台账', [
+          ['设备编号', '文本'],
+          ['设备名称', '文本'],
+          ['设备类型', '文本'],
+          ['安装日期', '日期'],
+          ['责任人', '文本'],
+          ['备注', '长文本'],
+        ], true)}
+      </div>
+      <div class="card-foot">
+        <button class="btn btn-sm" onclick="askModify()">需要修改</button>
+        <button class="btn btn-sm btn-primary" onclick="confirmCreate()">确认创建</button>
+      </div>
+    </div>
+  `);
+}
+
+// ===== 批量方案 =====
+function showBatchPlan() {
+  step = 2; badge('待确认','confirm');
+
+  const lines = ['一号线','二号线','三号线'];
+  let cards = '';
+  lines.forEach((l, i) => {
+    cards += buildArchiveCard(`${l}产量归档`, '变量触发 — 换班信号变化时', [
+      ['记录时间', '日期时间', '系统时间', ''],
+      ['班次', '文本', '当前班次', ''],
+      ['产量增量', '整数', '产品计数器', 'CHANGE()'],
+    ], i===0);
+    cards += buildAggCard(`${l}每日产量汇总`, `${l}产量归档`, '定时触发 — 每日 00:00', [
+      ['日期', '日期', '记录时间', '分组(按天)', ''],
+      ['日总产量', '整数', '产量增量', '求和(Sum)', ''],
+    ], i===0);
+  });
+
+  ai(`方案已生成。点击表名可展开详情，如需修改可直接输入调整说明。
+    <div class="card">
+      <div class="card-head">📋 批量建表方案 <span class="card-head-right">共 6 张表</span></div>
+      <div class="card-body" style="padding:12px;">
+        <div class="summary-bar">
+          <div class="summary-stats">
+            <div class="summary-stat"><span class="summary-num">6</span><span class="summary-label">张表</span></div>
+            <div class="summary-stat"><span class="summary-dot blue"></span><span>3 归档表</span></div>
+            <div class="summary-stat"><span class="summary-dot green"></span><span>3 聚合表</span></div>
+          </div>
+          <div>
+            <button class="btn btn-sm" onclick="toggleAll(true)" style="margin-right:4px;">全部展开</button>
+            <button class="btn btn-sm" onclick="toggleAll(false)">全部收起</button>
+          </div>
+        </div>
+        ${cards}
+      </div>
+      <div class="card-foot">
+        <button class="btn btn-sm" onclick="askModify()">需要修改</button>
+        <button class="btn btn-sm btn-primary" onclick="confirmCreate()">确认全部创建</button>
+      </div>
+    </div>
+  `);
+}
+
+// ===== 构建归档表卡片 =====
+function buildArchiveCard(name, trigger, fields, expanded) {
+  let rows = '';
+  fields.forEach(f => {
+    const src = f[3] ? `<span class="var-name">${f[2]}</span> <span class="formula-tag">${f[3]}</span>` : `<span class="var-name">${f[2]}</span>`;
+    rows += `<tr><td>${f[0]}</td><td>${f[1]}</td><td>${src}</td></tr>`;
+  });
+  return `
+    <div class="tbl-card">
+      <div class="tbl-head" onclick="toggle(this)">
+        <div class="tbl-left">
+          <span class="tbl-arrow ${expanded?'open':''}">▶</span>
+          <span class="tbl-name">${name}</span>
+          <span class="tbl-type archive">变量归档表</span>
+        </div>
+        <span class="tbl-meta">${fields.length} 字段</span>
+      </div>
+      <div class="tbl-detail ${expanded?'open':''}">
+        <div class="cfg-row"><span class="cfg-label">触发规则</span><span class="cfg-val">${trigger}</span></div>
+        <table class="f-table">
+          <thead><tr><th>字段名称</th><th>字段类型</th><th>数据来源</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ===== 构建聚合表卡片 =====
+function buildAggCard(name, sourceTable, trigger, fields, expanded) {
+  let rows = '';
+  fields.forEach(f => {
+    const src = f[4] ? `<span class="var-name">${f[2]}</span> <span class="formula-tag">${f[4]}</span>` : `<span class="var-name">${f[2]}</span>`;
+    rows += `<tr><td>${f[0]}</td><td>${f[1]}</td><td>${src}</td><td><span class="agg-tag">${f[3]}</span></td></tr>`;
+  });
+  return `
+    <div class="tbl-card">
+      <div class="tbl-head" onclick="toggle(this)">
+        <div class="tbl-left">
+          <span class="tbl-arrow ${expanded?'open':''}">▶</span>
+          <span class="tbl-name">${name}</span>
+          <span class="tbl-type agg">数据聚合表</span>
+        </div>
+        <span class="tbl-meta">${fields.length} 字段</span>
+      </div>
+      <div class="tbl-detail ${expanded?'open':''}">
+        <div class="cfg-row"><span class="cfg-label">原始表</span><span class="cfg-val"><b>${sourceTable}</b></span></div>
+        <div class="cfg-row"><span class="cfg-label">触发规则</span><span class="cfg-val">${trigger}</span></div>
+        <table class="f-table">
+          <thead><tr><th>字段名称</th><th>字段类型</th><th>数据来源</th><th>汇总方式</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ===== 构建基础表卡片 =====
+function buildBasicCard(name, fields, expanded) {
+  let rows = '';
+  fields.forEach(f => {
+    rows += `<tr><td>${f[0]}</td><td>${f[1]}</td></tr>`;
+  });
+  return `
+    <div class="tbl-card">
+      <div class="tbl-head" onclick="toggle(this)">
+        <div class="tbl-left">
+          <span class="tbl-arrow ${expanded?'open':''}">▶</span>
+          <span class="tbl-name">${name}</span>
+          <span class="tbl-type basic">基础数据表</span>
+        </div>
+        <span class="tbl-meta">${fields.length} 字段</span>
+      </div>
+      <div class="tbl-detail ${expanded?'open':''}">
+        <table class="f-table">
+          <thead><tr><th>字段名称</th><th>字段类型</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ===== 基础表方案 =====
+function showBasicPlan() {
+  step = 2; badge('待确认','confirm');
+
+  ai(`方案已生成，请审核以下配置。如需修改可直接输入调整说明。
+    <div class="card">
+      <div class="card-head">📋 建表方案 <span class="card-head-right">共 1 张表</span></div>
+      <div class="card-body" style="padding:12px;">
+        ${buildBasicCard('设备台账', [
+          ['设备编号', '文本'],
+          ['设备名称', '文本'],
+          ['设备类型', '文本'],
+          ['安装日期', '日期'],
+          ['责任人', '文本'],
+          ['所属产线', '文本'],
+          ['备注', '长文本'],
+        ], true)}
+      </div>
+      <div class="card-foot">
+        <button class="btn btn-sm" onclick="askModify()">需要修改</button>
+        <button class="btn btn-sm btn-primary" onclick="confirmCreate()">确认创建</button>
+      </div>
+    </div>
+  `);
+}
+
+// ===== 折叠展开 =====
+function toggle(el) {
+  el.querySelector('.tbl-arrow').classList.toggle('open');
+  el.nextElementSibling.classList.toggle('open');
+}
+function toggleAll(expand) {
+  document.querySelectorAll('.tbl-detail').forEach(d => { if(expand) d.classList.add('open'); else d.classList.remove('open'); });
+  document.querySelectorAll('.tbl-arrow').forEach(a => { if(expand) a.classList.add('open'); else a.classList.remove('open'); });
+  scroll();
+}
+
+// ===== 修改 =====
+function askModify() {
+  ai('请描述需要修改的内容，我会重新设计方案。');
+}
+function modifyPlan() {
+  typing();
+  setTimeout(()=>{ untype(); ai('收到，已根据您的反馈重新设计方案，请查看：<br><span style="font-size:12px;color:#999;">（实际产品中此处会输出更新后的完整配置卡片）</span>'); }, 1000);
+}
+
+// ===== 确认创建 =====
+function confirmCreate() {
+  user('确认，开始创建');
+  step = -1; badge('创建中','working'); typing();
+  setTimeout(()=>{
+    untype();
+    const logCard = `
+      <div class="card">
+        <div class="card-head">⏳ 执行建表 <span id="execTag" class="card-head-right" style="color:#e65100;">执行中</span></div>
+        <div class="card-body">
+          <div class="log-list" id="logList"><div class="log-wait">⏳ 开始创建数据表...</div></div>
+        </div>
+      </div>
+    `;
+    ai('收到，正在按依赖顺序执行建表操作。' + logCard);
+
+    const log = document.getElementById('logList');
+    const steps = [
+      {t:600,s:'<span class="log-ok">✓ 归档表创建成功</span>'},
+      {t:500,s:'<span class="log-ok">✓ 字段与触发规则已配置</span>'},
+      {t:600,s:'<span class="log-ok">✓ 聚合表创建成功，已关联原始表</span>'},
+      {t:400,s:'<span class="log-ok">✓ 数据服务已启用</span>'},
+    ];
+    let total = 0;
+    steps.forEach(s => { total += s.t; setTimeout(()=>{ const d=document.createElement('div'); d.innerHTML=s.s; log.appendChild(d); scroll(); }, total); });
+    setTimeout(()=>{
+      document.getElementById('execTag').textContent = '已完成';
+      document.getElementById('execTag').style.color = '#2e7d32';
+      step = 3; badge('完成');
+      ai('<b>✓ 全部创建完成。</b><br>数据表已自动启用，关闭窗口可在「数据管理」页查看。<br><span style="font-size:12px;color:#999;">如需继续创建，直接输入新需求即可。</span>');
+    }, total+500);
+  }, 800);
+}
+
+// ===== 初始化 =====
+ai(`您好，我是 <b>CMS 数据管理建表助手</b>。<br><br>数据管理模块用于对工程运行产生的数据进行统一归档与管理，覆盖<b>设备运行、故障报警、能源消耗、物料投入、产量统计、工艺追溯、人员记录</b>等场景。<br><br>请用自然语言描述您的建表需求，我会自动生成对应的数据表配置方案。也可以上传需求文档。
+  <div class="chips">
+    <span class="chip" onclick="quickFill('帮我建一个二号产线的能耗统计表，按班次记录换班时的电表变化量，然后按天汇总每日总能耗')">⚡ 能耗按班次统计</span>
+    <span class="chip" onclick="quickFill('创建一个设备台账表，包含编号、名称、安装日期、责任人')">📋 设备台账</span>
+    <span class="chip" onclick="quickFill('为所有产线建一套产量采集表和日报汇总表，共3条产线')">🏭 多产线批量建表</span>
+  </div>
+`);
+</script>
+</body>
+</html>
