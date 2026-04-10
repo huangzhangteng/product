@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CMS 历史库 — AI 智能归档</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'PingFang SC', 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    background: #f0f1f3;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #1a1a1a;
+  }
+
+  /* ===== 弹窗 ===== */
+  .modal {
+    width: 680px;
+    height: 86vh;
+    max-height: 840px;
+    background: #fff;
+    border: 1px solid #d0d0d0;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* 头部 */
+  .m-header {
+    height: 52px;
+    padding: 0 20px;
+    border-bottom: 1px solid #e5e5e5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    background: #fafafa;
+  }
+  .m-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  .m-title-icon { font-size: 18px; }
+  .m-badge {
+    font-size: 11px; font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 10px;
+    background: #e8f5e9; color: #2e7d32;
+  }
+  .m-badge.working { background: #fff3e0; color: #e65100; }
+  .m-badge.confirm { background: #e3f2fd; color: #1565c0; }
+  .m-close {
+    width: 28px; height: 28px;
+    border: 1px solid #d0d0d0; border-radius: 6px;
+    background: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; color: #999;
+    transition: all 0.15s;
+  }
+  .m-close:hover { background: #fef2f2; color: #dc2626; border-color: #fca5a5; }
+
+  /* 消息区 */
+  .chat { flex:1; overflow-y:auto; }
+  .chat::-webkit-scrollbar { width:5px; }
+  .chat::-webkit-scrollbar-thumb { background:#d0d0d0; border-radius:3px; }
+
+  .msg {
+    padding: 16px 24px;
+    font-size: 14px;
+    line-height: 1.75;
+    border-bottom: 1px solid #f5f5f5;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+  .msg.ai { background: #fff; }
+  .msg.user { background: #f0f4ff; }
+  .msg-tag {
+    font-size: 10px; font-weight: 700; color: #999;
+    margin-bottom: 6px; letter-spacing: 0.5px;
+  }
+
+  /* ===== 卡片通用 ===== */
+  .card {
+    margin-top: 14px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .card-head {
+    padding: 10px 16px;
+    background: #fafafa;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .card-head-right { font-size: 11px; color: #888; font-weight: 500; }
+  .card-body { padding: 16px; }
+  .card-foot {
+    padding: 10px 16px;
+    background: #fafafa;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* 需求确认列表 */
+  .kv-list { list-style:none; }
+  .kv-item {
+    display: flex;
+    padding: 8px 0;
+    border-bottom: 1px solid #f5f5f5;
+    font-size: 13px;
+    gap: 12px;
+  }
+  .kv-item:last-child { border-bottom:none; }
+  .kv-key { font-weight: 700; color: #555; min-width: 72px; flex-shrink:0; }
+  .kv-val { color: #1a1a1a; }
+
+  /* ===== 历史组卡片 ===== */
+  .tbl-card {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    background: #fff;
+    transition: border-color 0.15s;
+  }
+  .tbl-card:last-child { margin-bottom: 0; }
+  .tbl-card:hover { border-color: #bbb; }
+
+  .tbl-head {
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    background: #fafafa;
+    border-bottom: 1px solid #eee;
+    user-select: none;
+    transition: background 0.1s;
+  }
+  .tbl-head:hover { background: #f5f5f5; }
+  .tbl-left { display: flex; align-items: center; gap: 10px; }
+  .tbl-arrow { font-size: 10px; color: #aaa; transition: transform 0.2s; display: inline-block; }
+  .tbl-arrow.open { transform: rotate(90deg); }
+  .tbl-name { font-size: 13px; font-weight: 700; }
+  .tbl-type {
+    font-size: 10px; font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .tbl-type.timer { background: #e3f2fd; color: #1565c0; }
+  .tbl-type.change { background: #e8f5e9; color: #2e7d32; }
+  .tbl-meta { font-size: 11px; color: #aaa; }
+
+  .tbl-detail { display:none; padding: 14px; }
+  .tbl-detail.open { display:block; }
+
+  /* 配置信息行 */
+  .cfg-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 12px;
+    background: #f8f9fa;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .cfg-label { font-weight: 700; color: #666; min-width: 72px; }
+  .cfg-val { color: #1a1a1a; font-weight: 500; }
+  .cfg-val b { font-weight: 700; }
+
+  /* 变量列表表格 */
+  .f-table { width:100%; border-collapse:collapse; margin-top:8px; }
+  .f-table th {
+    background: #f5f6f7;
+    padding: 7px 10px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    color: #666;
+    border-bottom: 2px solid #e0e0e0;
+  }
+  .f-table td {
+    padding: 8px 10px;
+    font-size: 12px;
+    border-bottom: 1px solid #f0f0f0;
+    color: #333;
+  }
+  .f-table tr:last-child td { border-bottom: none; }
+  .f-table tr:hover td { background: #fafbfc; }
+
+  .var-name { color: #1565c0; font-weight: 600; }
+  .var-type {
+    font-size: 10px; font-weight: 600;
+    padding: 1px 6px; border-radius: 3px;
+    background: #f5f5f5; color: #666;
+    border: 1px solid #e0e0e0;
+  }
+  .strategy-tag {
+    font-size: 10px; font-weight: 700;
+    padding: 1px 6px; border-radius: 3px;
+  }
+  .strategy-tag.timer { background: #e3f2fd; color: #1565c0; border: 1px solid #90caf9; }
+  .strategy-tag.change { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+
+  /* 汇总栏 */
+  .summary-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 12px;
+  }
+  .summary-stats { display: flex; gap: 20px; font-weight: 600; }
+  .summary-stat { display: flex; align-items: center; gap: 4px; }
+  .summary-num { font-size: 20px; font-weight: 800; color: #1a1a1a; }
+  .summary-label { color: #888; }
+  .summary-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .summary-dot.blue { background: #1565c0; }
+  .summary-dot.green { background: #2e7d32; }
+
+  /* ===== 按钮 ===== */
+  .btn {
+    padding: 7px 16px;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    background: #fff;
+    color: #333;
+    font-weight: 600;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .btn:hover { background: #f5f5f5; border-color: #bbb; }
+  .btn-primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  .btn-primary:hover { background: #333; }
+  .btn-sm { padding: 5px 12px; font-size: 11px; }
+
+  /* 快捷标签 */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .chip {
+    font-size: 12px; padding: 6px 14px;
+    background: #f5f5f5; border: 1px solid #e0e0e0;
+    border-radius: 20px; cursor: pointer;
+    color: #555; transition: all 0.15s;
+    font-weight: 500;
+  }
+  .chip:hover { background: #e8f0fe; color: #1565c0; border-color: #90caf9; }
+
+  /* 输入区 */
+  .input-area {
+    padding: 12px 16px 14px;
+    border-top: 1px solid #e5e5e5;
+    background: #fafafa;
+    flex-shrink: 0;
+  }
+  .input-row {
+    display: flex;
+    border: 1px solid #d0d0d0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+    transition: border-color 0.15s;
+  }
+  .input-row:focus-within { border-color: #1565c0; box-shadow: 0 0 0 2px rgba(21,101,192,0.1); }
+  .input-attach {
+    width: 40px; display: flex; align-items: center; justify-content: center;
+    border-right: 1px solid #eee; cursor: pointer; font-size: 16px; color: #999;
+    background: #fafafa; flex-shrink: 0; border: none;
+  }
+  .input-attach:hover { color: #1565c0; background: #f0f4ff; }
+  .input-text {
+    flex:1; border:none; padding: 10px 14px;
+    font-size: 14px; font-family: inherit;
+    outline: none; background: transparent;
+  }
+  .input-send {
+    width: 44px; display: flex; align-items: center; justify-content: center;
+    background: #1a1a1a; color: #fff; border: none;
+    cursor: pointer; font-size: 14px; font-weight: 700; flex-shrink: 0;
+  }
+  .input-send:hover { background: #333; }
+  .input-hint { text-align:center; font-size:10px; color:#bbb; margin-top:6px; }
+
+  /* 打字 */
+  .dots { display:inline-flex; gap:4px; padding:4px 0; }
+  .dots span { width:5px; height:5px; background:#bbb; border-radius:50%; animation:blink 1.2s infinite ease-in-out; }
+  .dots span:nth-child(2) { animation-delay:0.2s; }
+  .dots span:nth-child(3) { animation-delay:0.4s; }
+  @keyframes blink { 0%,80%,100%{opacity:0.3;transform:scale(0.8)} 40%{opacity:1;transform:scale(1)} }
+
+  /* 创建日志 */
+  .log-list { font-size: 12px; line-height: 2; color: #666; }
+  .log-list div { animation: fadeIn 0.2s ease; }
+  .log-ok { color: #2e7d32; }
+  .log-wait { color: #999; }
+</style>
+</head>
+<body>
+
+<div class="modal">
+  <div class="m-header">
+    <div class="m-title">
+      <span class="m-title-icon">✨</span>
+      AI 智能归档
+      <span class="m-badge" id="badge">就绪</span>
+    </div>
+    <button class="m-close" title="关闭">✕</button>
+  </div>
+
+  <div class="chat" id="chat"></div>
+
+  <div class="input-area">
+    <div class="input-row">
+      <button class="input-attach" title="上传文档">📎</button>
+      <input class="input-text" id="inp" placeholder="描述您需要归档的变量数据..." onkeydown="if(event.key==='Enter'){event.preventDefault();send();}">
+      <button class="input-send" onclick="send()">➤</button>
+    </div>
+    <div class="input-hint">生成的配置在确认前不会写入系统</div>
+  </div>
+</div>
+
+<script>
+const chat = document.getElementById('chat');
+let step = 0;
+
+function scroll() { setTimeout(()=>{chat.scrollTop=chat.scrollHeight},50); }
+
+function ai(html) {
+  const d = document.createElement('div');
+  d.className = 'msg ai';
+  d.innerHTML = '<div class="msg-tag">AI 助手</div>' + html;
+  chat.appendChild(d); scroll(); return d;
+}
+function user(html) {
+  const d = document.createElement('div');
+  d.className = 'msg user';
+  d.innerHTML = '<div class="msg-tag">用户</div>' + html;
+  chat.appendChild(d); scroll();
+}
+function typing() {
+  const d = document.createElement('div');
+  d.className = 'msg ai'; d.id = 'typing';
+  d.innerHTML = '<div class="msg-tag">AI 助手</div><div class="dots"><span></span><span></span><span></span></div>';
+  chat.appendChild(d); scroll();
+}
+function untype() { const e=document.getElementById('typing'); if(e)e.remove(); }
+
+function badge(t, cls) {
+  const b = document.getElementById('badge');
+  b.textContent = t;
+  b.className = 'm-badge' + (cls ? ' '+cls : '');
+}
+function quickFill(t) { document.getElementById('inp').value = t; }
+function attachFile() { alert('原型演示：此处会打开文件选择器'); }
+
+// ===== 发消息 =====
+function send() {
+  const inp = document.getElementById('inp');
+  const t = inp.value.trim(); if(!t) return; inp.value = '';
+
+  if (step===0) { user(t); analyze(t); }
+  else if (step===2) { user(t); modifyPlan(); }
+  else if (step===3) { user(t); typing(); setTimeout(()=>{untype(); ai('如需继续配置，请直接描述新的归档需求。'); step=0; badge('就绪');}, 500); }
+}
+
+// ===== 分析需求 =====
+function analyze(t) {
+  step = -1; badge('分析中','working'); typing();
+  setTimeout(()=>{ untype(); showConfirm(); }, 1200);
+}
+
+// ===== 需求确认 =====
+function showConfirm() {
+  ai(`我对您的需求理解如下：
+    <div class="card">
+      <div class="card-head">📌 需求理解确认 <span class="card-head-right">请确认后再生成方案</span></div>
+      <div class="card-body">
+        <ul class="kv-list">
+          <li class="kv-item"><span class="kv-key">业务目标</span><span class="kv-val">对二号产线的温度和压力变量进行历史数据归档</span></li>
+          <li class="kv-item"><span class="kv-key">变量范围</span><span class="kv-val">二号产线下所有温度类和压力类变量</span></li>
+          <li class="kv-item"><span class="kv-key">归档策略</span><span class="kv-val">温度 — 变化记录；压力 — 500ms 定时记录</span></li>
+          <li class="kv-item"><span class="kv-key">配置方案</span><span class="kv-val"><b>创建 2 个历史组</b>：1 个变化记录组 + 1 个定时记录组</span></li>
+        </ul>
+      </div>
+      <div class="card-foot">
+        <button class="btn btn-sm" onclick="rejectConfirm()">有问题，我补充</button>
+        <button class="btn btn-sm btn-primary" onclick="acceptConfirm()">确认，生成方案</button>
+      </div>
+    </div>
+  `);
+  step = 0;
+}
+
+function rejectConfirm() {
+  ai('好的，请描述需要修改的内容，我会重新理解您的需求。');
+  step = 0; badge('等待输入');
+}
+
+// ===== 确认后生成方案 =====
+function acceptConfirm() {
+  user('确认无误，请生成方案');
+  step = 1; badge('生成中','working'); typing();
+  setTimeout(()=>{ untype(); showPlan(); }, 1500);
+}
+
+// ===== 配置方案 =====
+function showPlan() {
+  step = 2; badge('待确认','confirm');
+
+  ai(`方案已生成，请审核以下归档配置。如需修改可直接输入调整说明。
+    <div class="card">
+      <div class="card-head">📋 归档配置方案 <span class="card-head-right">共 2 个历史组 · 20 个变量</span></div>
+      <div class="card-body" style="padding:12px;">
+        <div class="summary-bar">
+          <div class="summary-stats">
+            <div class="summary-stat"><span class="summary-num">2</span><span class="summary-label">历史组</span></div>
+            <div class="summary-stat"><span class="summary-num">20</span><span class="summary-label">变量</span></div>
+          </div>
+          <div class="summary-stats">
+            <div class="summary-stat"><span class="summary-dot green"></span><span>变化记录 × 1</span></div>
+            <div class="summary-stat"><span class="summary-dot blue"></span><span>定时记录 × 1</span></div>
+          </div>
+        </div>
+
+        ${buildHistoryGroupCard('二号线温度监控组', 'change', {
+          strategy: '变化记录',
+          desc: '当变量值变化超过死区范围时记录一条数据。死区：0.5（绝对值）；最小时间间隔：0ms；最大时间间隔：不补偿'
+        }, [
+          ['模具温度1', 'Float', '通道2 / 温度组'],
+          ['模具温度2', 'Float', '通道2 / 温度组'],
+          ['料筒温度', 'Float', '通道2 / 温度组'],
+          ['冷却水进水温度', 'Float', '通道2 / 温度组'],
+          ['冷却水出水温度', 'Float', '通道2 / 温度组'],
+          ['油温', 'Float', '通道2 / 温度组'],
+          ['环境温度1', 'Float', '通道2 / 环境组'],
+          ['环境温度2', 'Float', '通道2 / 环境组'],
+          ['热流道温度1', 'Float', '通道2 / 热流道组'],
+          ['热流道温度2', 'Float', '通道2 / 热流道组'],
+          ['热流道温度3', 'Float', '通道2 / 热流道组'],
+          ['干燥机温度', 'Float', '通道2 / 辅机组'],
+        ], true)}
+
+        ${buildHistoryGroupCard('二号线压力监控组', 'timer', {
+          strategy: '定时记录（500ms）',
+          desc: '每隔 500ms 固定采样一次，适合需要连续趋势分析的信号'
+        }, [
+          ['注射压力', 'Float', '通道2 / 压力组'],
+          ['保压压力', 'Float', '通道2 / 压力组'],
+          ['背压', 'Float', '通道2 / 压力组'],
+          ['锁模力', 'Float', '通道2 / 压力组'],
+          ['系统油压', 'Float', '通道2 / 压力组'],
+          ['氮气瓶压力', 'Float', '通道2 / 压力组'],
+          ['冷却水压力', 'Float', '通道2 / 辅机组'],
+          ['气源压力', 'Float', '通道2 / 辅机组'],
+        ], true)}
+      </div>
+      <div class="card-foot">
+        <button class="btn btn-sm" onclick="askModify()">需要修改</button>
+        <button class="btn btn-sm btn-primary" onclick="confirmCreate()">确认创建</button>
+      </div>
+    </div>
+  `);
+}
+
+// ===== 构建历史组卡片 =====
+function buildHistoryGroupCard(name, type, config, variables, expanded) {
+  let rows = '';
+  variables.forEach(v => {
+    rows += `<tr>
+      <td><span class="var-name">${v[0]}</span></td>
+      <td><span class="var-type">${v[1]}</span></td>
+      <td style="color:#888;">${v[2]}</td>
+    </tr>`;
+  });
+
+  const typeLabel = type === 'change' ? '变化记录' : '定时记录';
+  const typeClass = type === 'change' ? 'change' : 'timer';
+
+  let cfgRows = `<div class="cfg-row"><span class="cfg-label">归档策略</span><span class="cfg-val"><span class="strategy-tag ${typeClass}">${config.strategy}</span></span></div>`;
+  cfgRows += `<div class="cfg-row"><span class="cfg-label">策略说明</span><span class="cfg-val" style="color:#888;font-weight:400;">${config.desc}</span></div>`;
+
+  return `
+    <div class="tbl-card">
+      <div class="tbl-head" onclick="toggle(this)">
+        <div class="tbl-left">
+          <span class="tbl-arrow ${expanded?'open':''}">▶</span>
+          <span class="tbl-name">${name}</span>
+          <span class="tbl-type ${typeClass}">${typeLabel}</span>
+        </div>
+        <span class="tbl-meta">${variables.length} 个变量</span>
+      </div>
+      <div class="tbl-detail ${expanded?'open':''}">
+        ${cfgRows}
+        <table class="f-table">
+          <thead><tr><th>变量名称</th><th>数据类型</th><th>所属分组</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ===== 折叠展开 =====
+function toggle(el) {
+  el.querySelector('.tbl-arrow').classList.toggle('open');
+  el.nextElementSibling.classList.toggle('open');
+}
+
+// ===== 修改 =====
+function askModify() {
+  ai('请描述需要修改的内容，我会重新设计方案。');
+}
+function modifyPlan() {
+  typing();
+  setTimeout(()=>{ untype(); ai('收到，已根据您的反馈重新设计方案，请查看：<br><span style="font-size:12px;color:#999;">（实际产品中此处会输出更新后的完整配置卡片）</span>'); }, 1000);
+}
+
+// ===== 确认创建 =====
+function confirmCreate() {
+  user('确认，开始创建');
+  step = -1; badge('创建中','working'); typing();
+  setTimeout(()=>{
+    untype();
+    const logCard = `
+      <div class="card">
+        <div class="card-head">⏳ 执行归档配置 <span id="execTag" class="card-head-right" style="color:#e65100;">执行中</span></div>
+        <div class="card-body">
+          <div class="log-list" id="logList"><div class="log-wait">⏳ 开始创建历史组...</div></div>
+        </div>
+      </div>
+    `;
+    ai('收到，正在执行归档配置。' + logCard);
+
+    const log = document.getElementById('logList');
+    const steps = [
+      {t:600,s:'<span class="log-ok">✓ 历史组「二号线温度监控组」创建成功</span>'},
+      {t:500,s:'<span class="log-ok">✓ 已绑定 12 个温度变量，归档策略：变化记录</span>'},
+      {t:600,s:'<span class="log-ok">✓ 历史组「二号线压力监控组」创建成功</span>'},
+      {t:500,s:'<span class="log-ok">✓ 已绑定 8 个压力变量，归档策略：定时记录(500ms)</span>'},
+      {t:400,s:'<span class="log-ok">✓ 归档服务已启用，开始记录数据</span>'},
+    ];
+    let total = 0;
+    steps.forEach(s => { total += s.t; setTimeout(()=>{ const d=document.createElement('div'); d.innerHTML=s.s; log.appendChild(d); scroll(); }, total); });
+    setTimeout(()=>{
+      document.getElementById('execTag').textContent = '已完成';
+      document.getElementById('execTag').style.color = '#2e7d32';
+      step = 3; badge('完成');
+      ai('<b>✓ 全部配置完成。</b><br>已创建 2 个历史组，共绑定 20 个变量，归档服务已启用。<br>关闭窗口可在「历史库」页查看。<br><span style="font-size:12px;color:#999;">如需继续配置，直接输入新需求即可。</span>');
+    }, total+500);
+  }, 800);
+}
+
+// ===== 初始化 =====
+ai(`您好，我是 <b>CMS 智能归档助手</b>。<br><br>历史库用于将设备和传感器产生的实时数据（温度、压力、流量、电流等）<b>按策略进行历史归档存储</b>，为趋势分析、故障追溯、监控告警等场景提供数据基础。<br><br>您只需描述哪些变量需要归档、用什么策略记录，我会自动完成历史组创建、变量绑定和策略配置。
+  <div class="chips">
+    <span class="chip" onclick="quickFill('把二号产线所有温度和压力变量都做历史归档，温度用变化记录，压力按500ms定时记录')">🌡️ 温度+压力归档</span>
+    <span class="chip" onclick="quickFill('把所有产线的电流电压变量按1秒定时归档')">⚡ 电气参数归档</span>
+    <span class="chip" onclick="quickFill('对全厂流量计和液位计做变化归档，死区0.1')">💧 流量液位归档</span>
+  </div>
+`);
+</script>
+</body>
+</html>
