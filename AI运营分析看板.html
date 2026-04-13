@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI运营分析看板</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg: #f4f7fb;
+            --panel: #ffffff;
+            --panel-soft: #f8fafc;
+            --line: #e2e8f0;
+            --line-strong: #cbd5e1;
+            --text: #0f172a;
+            --subtext: #475569;
+            --muted: #64748b;
+            --primary: #2563eb;
+            --primary-soft: #dbeafe;
+            --success: #16a34a;
+            --success-soft: #dcfce7;
+            --warning: #d97706;
+            --warning-soft: #ffedd5;
+            --teal: #0f766e;
+            --teal-soft: #ccfbf1;
+            --purple: #7c3aed;
+            --purple-soft: #ede9fe;
+            --shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: linear-gradient(180deg, #f7f9fc 0%, #f2f6fb 100%);
+            color: var(--text);
+            font-size: 14px;
+        }
+
+        .page {
+            max-width: 1480px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 24px;
+            margin-bottom: 20px;
+        }
+
+        .title-wrap h1 {
+            font-size: 28px;
+            line-height: 1.15;
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
+        }
+
+        .title-wrap p {
+            color: var(--subtext);
+            line-height: 1.6;
+        }
+
+        .meta-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .meta-tag {
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: flex-end;
+            min-width: 420px;
+            align-items: center;
+        }
+
+        .toolbar select,
+        .toolbar .status,
+        .toolbar input {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 10px 12px;
+            color: var(--subtext);
+            font-size: 13px;
+            min-width: 110px;
+            height: 42px;
+        }
+
+        .toolbar .status {
+            min-width: auto;
+            font-weight: 600;
+        }
+
+        .toolbar-btn {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: var(--panel);
+            color: var(--subtext);
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            height: 42px;
+        }
+
+        .toolbar-btn.primary {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #fff;
+        }
+
+        .custom-range {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .custom-range.active {
+            display: flex;
+        }
+
+        .range-sep {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .section {
+            margin-bottom: 20px;
+        }
+
+        .section-head {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+
+        .section-head h2 {
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+
+        .section-head p {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .group-block {
+            margin-top: 14px;
+        }
+
+        .group-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .group-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 800;
+            color: var(--text);
+        }
+
+        .group-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: var(--primary);
+            display: none;
+        }
+
+        .group-dot.stable {
+            background: #0f766e;
+        }
+
+        .group-dot.period {
+            background: #2563eb;
+        }
+
+        .group-dot.daily {
+            background: #d97706;
+        }
+
+        .group-desc {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .head-note {
+            font-size: 12px;
+            color: var(--muted);
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 7px 12px;
+            white-space: nowrap;
+        }
+
+        .kpi-grid {
+            display: grid;
+            gap: 12px;
+        }
+
+        .kpi-grid.six {
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+        }
+
+        .kpi-grid.five {
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+        }
+
+        .kpi-grid.four {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .kpi-grid.three {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .kpi-grid.two {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            box-shadow: var(--shadow);
+        }
+
+        .kpi-card {
+            padding: 16px;
+            min-height: 132px;
+        }
+
+        .kpi-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .kpi-label {
+            color: var(--subtext);
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.4;
+        }
+
+        .metric-code {
+            color: var(--muted);
+            background: var(--panel-soft);
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 3px 8px;
+            font-size: 10px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .metric-code,
+        .widget-id {
+            display: none;
+        }
+
+        .kpi-value {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            font-size: 28px;
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+            margin-bottom: 8px;
+        }
+
+        .delta {
+            font-size: 11px;
+            font-weight: 700;
+            border-radius: 999px;
+            padding: 4px 8px;
+        }
+
+        .delta.up {
+            color: var(--success);
+            background: var(--success-soft);
+        }
+
+        .delta.warn {
+            color: var(--warning);
+            background: var(--warning-soft);
+        }
+
+        .kpi-sub {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.55;
+        }
+
+        .mini-card {
+            padding: 14px 16px;
+        }
+
+        .mini-card .kpi-value {
+            font-size: 24px;
+            margin-bottom: 6px;
+        }
+
+        .focus-block {
+            padding: 14px;
+            border: 1px dashed #f0c48a;
+            background: linear-gradient(180deg, #fffaf3 0%, #ffffff 100%);
+        }
+
+        .panel-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .panel-grid.single {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .panel {
+            padding: 18px;
+        }
+
+        .panel-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .panel-title {
+            font-size: 14px;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+
+        .panel-desc {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.55;
+        }
+
+        .widget-id {
+            color: var(--primary);
+            background: var(--primary-soft);
+            border-radius: 999px;
+            padding: 4px 8px;
+            font-size: 10px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        thead th {
+            text-align: left;
+            padding: 12px 14px;
+            background: var(--panel-soft);
+            color: var(--subtext);
+            border-bottom: 1px solid var(--line);
+            font-weight: 800;
+        }
+
+        tbody td {
+            padding: 12px 14px;
+            color: var(--subtext);
+            border-bottom: 1px solid #eef2f7;
+            vertical-align: top;
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 8px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .badge.primary {
+            color: var(--primary);
+            background: var(--primary-soft);
+        }
+
+        .badge.teal {
+            color: var(--teal);
+            background: var(--teal-soft);
+        }
+
+        .badge.purple {
+            color: var(--purple);
+            background: var(--purple-soft);
+        }
+
+        .footer-note {
+            margin-top: 14px;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 1320px) {
+            .kpi-grid.six,
+            .kpi-grid.five,
+            .kpi-grid.three {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 1120px) {
+            .panel-grid,
+            .kpi-grid.five,
+            .kpi-grid.three,
+            .kpi-grid.two,
+            .kpi-grid.four {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .topbar {
+                flex-direction: column;
+            }
+
+            .toolbar {
+                justify-content: flex-start;
+                min-width: 0;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .page {
+                padding: 16px;
+            }
+
+            .kpi-grid.six,
+            .kpi-grid.five,
+            .kpi-grid.three,
+            .kpi-grid.two,
+            .panel-grid,
+            .kpi-grid.four {
+                grid-template-columns: 1fr;
+            }
+
+            .section-head {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="topbar">
+            <div class="title-wrap">
+                <h1>AI运营分析看板</h1>
+            </div>
+            <div class="toolbar">
+                <select id="dateRangeSelect">
+                    <option selected>近 7 天</option>
+                    <option>最近 30 天</option>
+                    <option>最近 90 天</option>
+                    <option>自定义</option>
+                </select>
+                <div class="custom-range" id="customRangeWrap">
+                    <input type="date" id="customStartDate" aria-label="开始日期">
+                    <span class="range-sep">至</span>
+                    <input type="date" id="customEndDate" aria-label="结束日期">
+                </div>
+                <select>
+                    <option selected>全部用户</option>
+                    <option>国内用户</option>
+                    <option>海外用户</option>
+                </select>
+                <button class="toolbar-btn" type="button">刷新</button>
+                <button class="toolbar-btn primary" type="button">导出</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-head">
+                <div>
+                    <h2>核心指标</h2>
+                </div>
+            </div>
+            <div class="group-block">
+                <div class="group-head">
+                    <div class="group-title"><span class="group-dot daily"></span>活跃与留存</div>
+                </div>
+                <div class="kpi-grid four">
+                    <div class="card kpi-card" data-metric="dau">
+                        <div class="kpi-top">
+                            <div class="kpi-label">DAU</div>
+                            <div class="metric-code">dau</div>
+                        </div>
+                        <div class="kpi-value">9 <span class="delta up">+12.5%</span></div>
+                        <div class="kpi-sub">固定统计当前日期当天活跃用户</div>
+                    </div>
+                    <div class="card kpi-card" data-metric="returning_users_today">
+                        <div class="kpi-top">
+                            <div class="kpi-label">今日回访用户</div>
+                            <div class="metric-code">returning_users_today</div>
+                        </div>
+                        <div class="kpi-value">5 <span class="delta warn">重点关注</span></div>
+                        <div class="kpi-sub">固定统计当前日期回访用户</div>
+                    </div>
+                    <div class="card kpi-card" data-metric="wau">
+                        <div class="kpi-top">
+                            <div class="kpi-label">WAU</div>
+                            <div class="metric-code">wau</div>
+                        </div>
+                        <div class="kpi-value">24</div>
+                        <div class="kpi-sub">固定统计当前日期往前 7 天活跃用户</div>
+                    </div>
+                    <div class="card kpi-card" data-metric="retention_d1">
+                        <div class="kpi-top">
+                            <div class="kpi-label">次日留存率</div>
+                            <div class="metric-code">retention_d1</div>
+                        </div>
+                        <div class="kpi-value">42.3%</div>
+                        <div class="kpi-sub">固定统计当前日期可观测 cohort 的次日留存</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="group-block">
+                <div class="group-head">
+                    <div class="group-title"><span class="group-dot stable"></span>增长与激活</div>
+                </div>
+                <div class="kpi-grid four">
+                    <div class="card kpi-card" data-metric="new_users_period">
+                        <div class="kpi-top">
+                            <div class="kpi-label">周期新增用户</div>
+                            <div class="metric-code">new_users_period</div>
+                        </div>
+                        <div class="kpi-value">6 <span class="delta up">+20%</span></div>
+                        <div class="kpi-sub">跟随筛选周期变化</div>
+                    </div>
+                    <div class="card kpi-card" data-metric="registered_users_total">
+                        <div class="kpi-top">
+                            <div class="kpi-label">累计注册用户</div>
+                            <div class="metric-code">registered_users_total</div>
+                        </div>
+                        <div class="kpi-value">72</div>
+                        <div class="kpi-sub">截至筛选结束日期的累计注册用户数</div>
+                    </div>
+                    <div class="card kpi-card" data-metric="activated_users_total">
+                        <div class="kpi-top">
+                            <div class="kpi-label">累计激活用户</div>
+                            <div class="metric-code">activated_users_total</div>
+                        </div>
+                        <div class="kpi-value">45</div>
+                        <div class="kpi-sub">截至筛选结束日期的累计激活用户数</div>
+                    </div>
+                    <div class="card kpi-card" data-metric="activation_rate_total">
+                        <div class="kpi-top">
+                            <div class="kpi-label">激活率</div>
+                            <div class="metric-code">activation_rate_total</div>
+                        </div>
+                        <div class="kpi-value">62.5%</div>
+                        <div class="kpi-sub">跟随筛选结束日期更新</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="group-block">
+                <div class="group-head">
+                    <div class="group-title"><span class="group-dot period"></span>Token 消耗与充值</div>
+                </div>
+                <div class="kpi-grid six">
+                    <div class="card kpi-card" data-metric="tokens_total_period">
+                        <div class="kpi-top">
+                            <div class="kpi-label">总 Token 消耗</div>
+                            <div class="metric-code">tokens_total_period</div>
+                        </div>
+                        <div class="kpi-value">4.26M</div>
+                        <div class="kpi-sub">input token + output token 汇总</div>
+                    </div>
+                    <div class="card kpi-card" data-metric="calls_total_period">
+                        <div class="kpi-top">
+                            <div class="kpi-label">总调用次数</div>
+                            <div class="metric-code">calls_total_period</div>
+                        </div>
+                        <div class="kpi-value">396</div>
+                        <div class="kpi-sub">周期内有效调用事件数</div>
+                    </div>
+                    <div class="card kpi-card" data-metric="avg_calls_per_active_user">
+                        <div class="kpi-top">
+                            <div class="kpi-label">人均调用次数</div>
+                            <div class="metric-code">avg_calls_per_active_user</div>
+                        </div>
+                        <div class="kpi-value">16.5</div>
+                        <div class="kpi-sub">总调用次数 / 周期活跃用户数</div>
+                    </div>
+                    <div class="card kpi-card" data-metric="avg_token_per_call">
+                        <div class="kpi-top">
+                            <div class="kpi-label">次均 Token</div>
+                            <div class="metric-code">avg_token_per_call</div>
+                        </div>
+                        <div class="kpi-value">10.8K</div>
+                        <div class="kpi-sub">总 Token / 总调用次数</div>
+                    </div>
+                    <div class="card kpi-card" data-metric="paying_users_period">
+                        <div class="kpi-top">
+                            <div class="kpi-label">充值用户数</div>
+                            <div class="metric-code">paying_users_period</div>
+                        </div>
+                        <div class="kpi-value">3</div>
+                        <div class="kpi-sub">所选周期内至少完成 1 笔成功充值订单</div>
+                    </div>
+                    <div class="card kpi-card" data-metric="recharge_amount_period">
+                        <div class="kpi-top">
+                            <div class="kpi-label">充值金额</div>
+                            <div class="metric-code">recharge_amount_period</div>
+                        </div>
+                        <div class="kpi-value">¥300 <span class="delta up">+15%</span></div>
+                        <div class="kpi-sub">成功充值订单实付金额汇总</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-head">
+                <div>
+                    <h2>趋势、转化与使用</h2>
+                </div>
+            </div>
+            <div class="panel-grid">
+                <div class="card panel" data-widget="widget_user_funnel">
+                    <div class="panel-top">
+                        <div>
+                            <div class="panel-title">用户转化漏斗</div>
+                            <div class="panel-desc">从注册到首用、活跃、充值的转化层级。</div>
+                        </div>
+                        <div class="widget-id">W02 user_funnel</div>
+                    </div>
+                    <canvas id="userFunnelChart" height="230"></canvas>
+                </div>
+                <div class="card panel" data-widget="widget_usage_depth_dist">
+                    <div class="panel-top">
+                        <div>
+                            <div class="panel-title">用户使用频次分布</div>
+                            <div class="panel-desc">按用户调用次数分桶，快速识别尝鲜用户和高频用户占比。</div>
+                        </div>
+                        <div class="widget-id">W04 usage_depth_dist</div>
+                    </div>
+                    <canvas id="usageDepthChart" height="230"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-head">
+                <div>
+                    <h2>明细表</h2>
+                </div>
+            </div>
+            <div class="panel-grid">
+                <div class="card panel" data-widget="widget_feature_table">
+                    <div class="panel-top">
+                        <div>
+                            <div class="panel-title">功能使用明细</div>
+                            <div class="panel-desc">按功能维度展示调用量、活跃用户和 Token 负载。</div>
+                        </div>
+                        <div class="widget-id">T01 feature_usage_table</div>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>功能</th>
+                                    <th>功能编码</th>
+                                    <th>活跃用户</th>
+                                    <th>调用次数</th>
+                                    <th>Token(K)</th>
+                                    <th>次均Token</th>
+                                    <th>调用占比</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="badge primary">AI 页面生成</span></td>
+                                    <td>feature_page_gen</td>
+                                    <td>16</td>
+                                    <td>102</td>
+                                    <td>1,240</td>
+                                    <td>12.2K</td>
+                                    <td>25.8%</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge teal">AI 脚本生成</span></td>
+                                    <td>feature_script_gen</td>
+                                    <td>15</td>
+                                    <td>88</td>
+                                    <td>910</td>
+                                    <td>10.3K</td>
+                                    <td>22.2%</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge purple">AI 变量生成</span></td>
+                                    <td>feature_variable_gen</td>
+                                    <td>11</td>
+                                    <td>61</td>
+                                    <td>520</td>
+                                    <td>8.5K</td>
+                                    <td>15.4%</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge primary">AI 自动建表（历史）</span></td>
+                                    <td>feature_auto_table_history</td>
+                                    <td>9</td>
+                                    <td>47</td>
+                                    <td>430</td>
+                                    <td>9.1K</td>
+                                    <td>11.9%</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge teal">AI 自动建表（数据管理）</span></td>
+                                    <td>feature_auto_table_dm</td>
+                                    <td>8</td>
+                                    <td>39</td>
+                                    <td>390</td>
+                                    <td>10.0K</td>
+                                    <td>9.8%</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge purple">AI 图片生成</span></td>
+                                    <td>feature_image_gen</td>
+                                    <td>7</td>
+                                    <td>33</td>
+                                    <td>470</td>
+                                    <td>14.2K</td>
+                                    <td>8.3%</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge primary">AI 模型生成</span></td>
+                                    <td>feature_model_gen</td>
+                                    <td>6</td>
+                                    <td>26</td>
+                                    <td>300</td>
+                                    <td>11.5K</td>
+                                    <td>6.6%</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card panel" data-widget="widget_daily_table">
+                    <div class="panel-top">
+                        <div>
+                            <div class="panel-title">按日汇总明细</div>
+                            <div class="panel-desc">补充展示核心指标的日粒度数据行。</div>
+                        </div>
+                        <div class="widget-id">T02 daily_metric_table</div>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>日期</th>
+                                    <th>新增</th>
+                                    <th>激活</th>
+                                    <th>DAU</th>
+                                    <th>回访</th>
+                                    <th>调用次数</th>
+                                    <th>Token(K)</th>
+                                    <th>充值用户</th>
+                                    <th>充值金额</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>04/04</td><td>1</td><td>1</td><td>6</td><td>2</td><td>38</td><td>420</td><td>0</td><td>¥0</td></tr>
+                                <tr><td>04/05</td><td>0</td><td>1</td><td>5</td><td>2</td><td>28</td><td>310</td><td>1</td><td>¥100</td></tr>
+                                <tr><td>04/06</td><td>1</td><td>0</td><td>4</td><td>1</td><td>16</td><td>190</td><td>0</td><td>¥0</td></tr>
+                                <tr><td>04/07</td><td>0</td><td>1</td><td>8</td><td>4</td><td>57</td><td>640</td><td>0</td><td>¥0</td></tr>
+                                <tr><td>04/08</td><td>2</td><td>2</td><td>7</td><td>4</td><td>49</td><td>520</td><td>1</td><td>¥180</td></tr>
+                                <tr><td>04/09</td><td>1</td><td>2</td><td>11</td><td>6</td><td>96</td><td>1,040</td><td>0</td><td>¥0</td></tr>
+                                <tr><td>04/10</td><td>1</td><td>2</td><td>9</td><td>5</td><td>112</td><td>1,140</td><td>1</td><td>¥20</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const dateRangeSelect = document.getElementById('dateRangeSelect');
+            const customRangeWrap = document.getElementById('customRangeWrap');
+            const customStartDate = document.getElementById('customStartDate');
+            const customEndDate = document.getElementById('customEndDate');
+
+            function formatDate(date) {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return year + '-' + month + '-' + day;
+            }
+
+            function updateCustomRangeVisibility() {
+                const isCustom = dateRangeSelect.value === '自定义';
+                customRangeWrap.classList.toggle('active', isCustom);
+            }
+
+            const today = new Date();
+            const defaultStart = new Date(today);
+            defaultStart.setDate(today.getDate() - 6);
+            customEndDate.value = formatDate(today);
+            customStartDate.value = formatDate(defaultStart);
+            dateRangeSelect.addEventListener('change', updateCustomRangeVisibility);
+            updateCustomRangeVisibility();
+
+            const dates = ['04/04', '04/05', '04/06', '04/07', '04/08', '04/09', '04/10'];
+            const colorText = '#64748b';
+            const colorGrid = 'rgba(148, 163, 184, 0.18)';
+
+            const commonLegend = {
+                position: 'top',
+                labels: {
+                    color: colorText,
+                    boxWidth: 12,
+                    usePointStyle: true,
+                    pointStyle: 'circle',
+                    padding: 16
+                }
+            };
+
+            new Chart(document.getElementById('userFunnelChart'), {
+                type: 'bar',
+                data: {
+                    labels: ['累计注册', '完成首用', '近7天活跃', '充值用户'],
+                    datasets: [{
+                        data: [72, 45, 24, 3],
+                        backgroundColor: ['#bfdbfe', '#99f6e4', '#fcd34d', '#c4b5fd'],
+                        borderRadius: 10,
+                        borderSkipped: false
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function (ctx) {
+                                    return '用户数：' + ctx.raw;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: colorGrid },
+                            ticks: { color: colorText }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: { color: colorText }
+                        }
+                    }
+                }
+            });
+
+            new Chart(document.getElementById('usageDepthChart'), {
+                type: 'bar',
+                data: {
+                    labels: ['0次', '1-2次', '3-5次', '6-10次', '>10次'],
+                    datasets: [{
+                        data: [27, 18, 14, 8, 5],
+                        backgroundColor: ['#e2e8f0', '#bfdbfe', '#99f6e4', '#fcd34d', '#c4b5fd'],
+                        borderRadius: 8,
+                        borderSkipped: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function (ctx) {
+                                    return '用户数：' + ctx.raw + '，占比 ' + ((ctx.raw / 72) * 100).toFixed(1) + '%';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: colorText }
+                        },
+                        y: {
+                            grid: { color: colorGrid },
+                            ticks: { color: colorText, stepSize: 5 }
+                        }
+                    }
+                }
+            });
+
+        });
+    </script>
+</body>
+</html>
